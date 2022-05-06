@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Hello Bulma!</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.3/css/bulma.min.css">
+  </head>
+  <body>
+  <section class="section">
+    <h1 class="title">SmartBCH Staking Frontend</h1>
+    <div class="tabs">
+      <ul>
+        <li id="tabValOps" class="is-active"><a>Validator Ops</a></li>
+        <li id="tabGasOps"><a>GasPrice Proposal</a></li>
+      </ul>
+    </div>
+  </section>
+
+  <section id="secValOps" class="section">
+    <div class="panel is-link">
+      <p class="panel-heading">All Validators</p>
+      <div class="box">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>CreatedBy</th>
+              <th>RewardTo</th>
+              <th>Minner</th>
+              <th>PubKey</th>
+              <th>Introduction</th>
+              <th>StakedCoins</th>
+              <th>IsRetiring</th>
+              <th>VotingPower</th>
+            </tr>
+          </thead>
+          <tbody id="valRows">
+            <!--
+            <tr>
+              <td>0x</td>
+              <td>0x</td>
+              <td>0x</td>
+              <td>0x</td>
+              <td>?</td>
+              <td>?</td>
+              <td>?</td>
+              <td>?</td>
+            </tr>
+            -->
+          </tbody>
+        </table>
+        <div class="control">
+          <button class="button is-link" id="viewValsBtn">Refresh</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel is-link">
+      <p class="panel-heading">Create Validator</p>
+      <div class="box">     
+        <div class="field">
+          <label class="label">RewardTo (address)</label>
+          <input class="input" type="text" placeholder="0x0000000000000000000000000000000000000000" id="createValRewardTo">
+        </div> 
+        <div class="field">
+          <label class="label">Introduction (bytes32)</label>
+          <input class="input" type="text" placeholder="at most 32 ASCI chars" id="createValIntro">
+        </div> 
+        <div class="field">
+          <label class="label">PubKey (bytes32)</label>
+          <input class="input" type="text" placeholder="0x0000000000000000000000000000000000000000000000000000000000000000" id="createValPubKey">
+        </div>
+        <div class="control">
+          <button class="button is-link" id="createValBtn">Submit</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel is-link">
+      <p class="panel-heading">Edit Validator</p>
+      <div class="box">     
+        <div class="field">
+          <label class="label">RewardTo (address)</label>
+          <input class="input" type="text" placeholder="0x0000000000000000000000000000000000000000" id="editValRewardTo">
+        </div> 
+        <div class="field">
+          <label class="label">Introduction (bytes32)</label>
+          <input class="input" type="text" placeholder="at most 32 ASCI chars" id="editValIntro">
+        </div> 
+        <div class="control">
+          <button class="button is-link" id="editValBtn">Submit</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel is-link">
+      <p class="panel-heading">Retire Validator</p>
+      <div class="box">     
+        <div class="control">
+          <button class="button is-link" id="retireValBtn">Submit</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="secGasOps" class="section is-hidden">
+    <div class="panel is-link">
+      <p class="panel-heading">Current GasPrice (gwei)</p>
+      <div class="box">     
+        <div class="field">
+          <input class="input" type="text" id="currGasPrice" readonly>
+        </div>
+        <div class="control">
+          <button class="button is-link" id="getGasPriceBtn">Refresh</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel is-link">
+      <p class="panel-heading">View GasPrice Proposal</p>
+      <div class="box">
+        <div class="field">
+          <label class="label">Target Gas Price (gwei)</label>
+          <input class="input" type="text" id="proposalTarget" readonly>
+        </div>
+        <div class="field">
+          <label class="label">Deadline</label>
+          <input class="input" type="text" id="proposalDeadline" readonly>
+        </div>
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Validator</th>
+              <th>Target</th>
+              <th>VotingPower</th>
+            </tr>
+          </thead>
+          <tbody id="voteRows">
+            <!--
+            <tr>
+              <td>?</td>
+              <td>?</td>
+              <td>?</td>
+            </tr>
+            -->
+          </tbody>
+        </table>
+        <div class="control">
+          <button class="button is-link" id="viewProposalBtn">Refresh</button>
+          <button class="button is-link" id="execProposalBtn">Execute</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel is-link">
+      <p class="panel-heading">Create/Vote GasPrice Proposal</p>
+      <div class="box">     
+        <div class="field">
+          <label class="label">GasPrice (gwei)</label>
+          <input class="input" type="text" placeholder="1.05" id="votedGasPrice">
+        </div>
+        <div class="control">
+          <button class="button is-link" id="createProposalBtn">Create</button>
+          <button class="button is-link" id="voteProposalBtn">Vote</button>
+        </div>
+      </div>
+    </div>
+
+  </section>
+  <script type="module">
+import { ethers } from "./ethers-5.4.esm.min.js";
+import u from './umbrella-3.3.0.esm.js';
+
+
+// A Web3Provider wraps a standard Web3 provider, which is
+// what MetaMask injects as window.ethereum into each page
+const provider = new ethers.providers.Web3Provider(window.ethereum)
+
+// MetaMask requires requesting permission to connect users accounts
+await provider.send("eth_requestAccounts", []);
+
+// The MetaMask plugin also allows signing transactions to
+// send ether and pay to change state within the blockchain.
+// For this, you need the account signer...
+const signer = provider.getSigner();
+const myAddr = await signer.getAddress();
+console.log('myAddr:', myAddr);
+
+
+const stakingAddr = '0x0000000000000000000000000000000000002710';
+const stakingABI = [
+  `function createValidator(address rewardTo, bytes32 introduction, bytes32 pubkey) payable external`,
+  `function editValidator(address rewardTo, bytes32 introduction) external`,
+  `function retire() external`,
+  `function proposal(uint target) external`,
+  `function vote(uint target) external`,
+  `function executeProposal() external`,
+  `function getVote(address validator) external view returns (uint)`,
+];
+const staking = new ethers.Contract(stakingAddr, stakingABI, signer);
+
+
+u('#tabValOps').handle('click', async (e) => {
+  u('#tabValOps').addClass('is-active');
+  u('#tabGasOps').removeClass('is-active');
+  u('#secValOps').removeClass('is-hidden');
+  u('#secGasOps').addClass('is-hidden');
+});
+u('#tabGasOps').handle('click', async (e) => {
+  u('#tabGasOps').addClass('is-active');
+  u('#tabValOps').removeClass('is-active');
+  u('#secGasOps').removeClass('is-hidden');
+  u('#secValOps').addClass('is-hidden');
+});
+
+u('#viewValsBtn').handle('click', async (e) => {
+  console.log('viewValsBtn');
+  const vals = await getAllValidators();
+  console.log(vals);
+  u('#valRows').empty();
+  for (let val of vals.validators) {
+    u('#valRows').append(`<tr>
+  <td><abbr title="${val.address}">${val.address.substring(0, 10)}</abbr></td>
+  <td><abbr title="${val.reward_to}">${val.reward_to.substring(0, 10)}</abbr></td>
+  <td><abbr title="${'0x'+val.miner_address}">${'0x'+val.miner_address.substring(0, 8)}</abbr></td>
+  <td><abbr title="${val.pubkey}">${val.pubkey.substring(0, 10)}</abbr></td>
+  <td>${val.introduction}</td>
+  <td>${ethers.utils.formatUnits(val.staked_coins)}</td>
+  <td>${val.is_retiring}</td>
+  <td>${val.voting_power}</td>
+</tr>`);
+  }
+});
+  // <td><abbr title="${full}">${abbr}</abbr></td>
+u('#createValBtn').handle('click', async (e) => {
+  const rewardTo = u('#createValRewardTo').first().value;
+  const intro = u('#createValIntro').first().value;
+  const pubKey = u('#createValPubKey').first().value;
+  console.log(rewardTo, intro, pubKey);
+  await createVal(rewardTo, intro, pubKey);
+});
+u('#editValBtn').handle('click', async (e) => {
+  const rewardTo = u('#editValRewardTo').first().value;
+  const intro = u('#editValIntro').first().value;
+  console.log(rewardTo, intro);
+  await editVal(rewardTo, intro);
+});
+u('#retireValBtn').handle('click', async (e) => {
+  console.log('retire');
+  await retireVal();
+});
+
+u('#getGasPriceBtn').handle('click', async (e) => {
+  const gasPrice = await getGasPrice();
+  console.log(gasPrice);
+  u('#currGasPrice').first().value = ethers.utils.formatUnits(gasPrice, 'gwei');
+});
+u('#viewProposalBtn').handle('click', async (e) => {
+  console.log('viewProposalBtn');
+  const proposal = await getProposal();
+  console.log(proposal);
+  u('#proposalTarget').first().value = proposal.target;
+  u('#proposalDeadline').first().value = proposal.deadline;
+  const votes = await getVotes();
+  console.log(votes);
+  u('#voteRows').empty();
+  for (let vote of votes) {
+    u('#voteRows').append(`<tr>
+  <td>${vote.valAddr}</td>
+  <td>${vote.target}</td>
+  <td>${vote.votingPower}</td>
+</tr>`);
+  }
+});
+u('#createProposalBtn').handle('click', async (e) => {
+  const gasPriceGwei = u('#votedGasPrice').first().value;
+  const gasPrice = ethers.utils.parseUnits(gasPriceGwei, 'gwei');
+  console.log('createProposalBtn', gasPriceGwei, gasPrice);
+  await createProposal(gasPrice);
+});
+u('#voteProposalBtn').handle('click', async (e) => {
+  const gasPriceGwei = u('#votedGasPrice').first().value;
+  const gasPrice = ethers.utils.parseUnits(gasPriceGwei, 'gwei');
+  console.log('voteProposalBtn', gasPriceGwei, gasPrice);
+  // TODO
+});
+u('#execProposalBtn').handle('click', async (e) => {
+  console.log('execProposalBtn');
+  await execProposal();
+});
+
+async function getAllValidators() {
+  // const provider = new ethers.providers.Web3Provider(window.ethereum);
+  const provider = new ethers.providers.JsonRpcProvider({
+    // url    : 'https://rpc.uatvo.com',
+    url    : 'http://localhost:8545',
+    timeout: 5000,
+  });
+
+  return await provider.send('sbch_validatorsInfo', []);
+}
+
+async function createVal(rewardTo, intro, pubKey) {
+  intro = ethers.utils.formatBytes32String( intro );
+  console.log('intro:', intro);
+  const tx = await staking.createValidator(rewardTo, intro, pubKey, {value: 1});
+  console.log(tx);
+}
+async function editVal(rewardTo, intro) {
+  intro = ethers.utils.formatBytes32String( intro );
+  console.log('intro:', intro);
+  const tx = await staking.editValidator(rewardTo, intro);
+  console.log(tx);
+}
+async function retireVal() {
+  const tx = await staking.retire();
+  console.log(tx);
+}
+
+async function getGasPrice() {
+  return await provider.getStorageAt(stakingAddr, 2);
+}
+async function getProposal() {
+  const result = await provider.getStorageAt(stakingAddr, 4);
+  if (result == '0x00000000000000000000000000000000') {
+    return {
+      target: 'No Proposal',
+      deadline: '',
+    };
+  } else {
+    return {
+      target: ethers.utils.formatUnits(result.substring(0, 18), 'gwei'),
+      deadline: new Date(Number('0x' + result.substring(18)) * 1000),
+    };
+  }
+}
+async function getVotes() {
+  const vals = await getAllValidators();
+  const valAddrs = vals.validators.map(val => val.address);
+  // console.log(valAddrs);
+  const votes = [];
+  for (let addr of valAddrs) {
+    const key = ethers.utils.sha256('0x766f7465' + addr.substring(2));
+    // console.log(key);
+    const result = await provider.getStorageAt(stakingAddr, key);
+    // console.log(result);
+    if (result != '0x0000000000000000000000000000000000000000000000000000000000000000') {
+      votes.push({
+        valAddr    : addr,
+        target     : ethers.utils.formatUnits(result.substring(0, 18), 'gwei'),
+        votingPower: '0x' + result.substring(18),
+      });
+    }
+  }
+  return votes;
+}
+async function createProposal(gasPrice) {
+  const tx = await staking.proposal(gasPrice);
+  console.log(tx);
+}
+async function execProposal() {
+  const tx = await staking.executeProposal();
+  console.log(tx);
+}
+
+  </script>
+  </body>
+</html>
