@@ -170,6 +170,7 @@
   <script type="module">
 import { ethers } from "./ethers-5.4.esm.min.js";
 import u from './umbrella-3.3.0.esm.js';
+import { toast } from './bulma-toast.esm.js';
 
 
 // A Web3Provider wraps a standard Web3 provider, which is
@@ -214,11 +215,17 @@ u('#tabGasOps').handle('click', async (e) => {
 });
 
 u('#viewValsBtn').handle('click', async (e) => {
-  console.log('viewValsBtn');
-  const vals = await getAllValidators();
-  console.log(vals);
+  u('#viewValsBtn').first().disabled = true;
+  const allVals = await getAllValidators()
+    .then(result => result.validators)
+    .catch(err => {
+      console.log(err);
+      return [];
+    });
+
+  u('#viewValsBtn').first().disabled = false;
   u('#valRows').empty();
-  for (let val of vals.validators) {
+  for (let val of allVals) {
     u('#valRows').append(`<tr>
   <td><abbr title="${val.address}">${val.address.substring(0, 10)}</abbr></td>
   <td><abbr title="${val.reward_to}">${val.reward_to.substring(0, 10)}</abbr></td>
@@ -236,33 +243,67 @@ u('#createValBtn').handle('click', async (e) => {
   const rewardTo = u('#createValRewardTo').first().value;
   const intro = u('#createValIntro').first().value;
   const pubKey = u('#createValPubKey').first().value;
-  console.log(rewardTo, intro, pubKey);
-  await createVal(rewardTo, intro, pubKey);
+
+  u('#createValBtn').first().disabled = true;
+  try {
+    await createVal(rewardTo, intro, pubKey);
+    showMsg('ok');
+  } catch (err) {
+    showErr(err);
+  }
+  u('#createValBtn').first().disabled = false;
 });
 u('#editValBtn').handle('click', async (e) => {
   const rewardTo = u('#editValRewardTo').first().value;
   const intro = u('#editValIntro').first().value;
-  console.log(rewardTo, intro);
-  await editVal(rewardTo, intro);
+
+  u('#editValBtn').first().disabled = true;
+  try {
+    await editVal(rewardTo, intro);
+    showMsg('ok');
+  } catch (err) {
+    showErr(err);
+  }
+  u('#editValBtn').first().disabled = false;
 });
 u('#retireValBtn').handle('click', async (e) => {
-  console.log('retire');
-  await retireVal();
+  u('#retireValBtn').first().disabled = true;
+  try {
+    await retireVal();
+    showMsg('ok');
+  } catch (err) {
+    showErr(err);
+  }
+  u('#retireValBtn').first().disabled = false;
 });
 
 u('#getGasPriceBtn').handle('click', async (e) => {
-  const gasPrice = await getGasPrice();
-  console.log(gasPrice);
-  u('#currGasPrice').first().value = ethers.utils.formatUnits(gasPrice, 'gwei');
+  u('#getGasPriceBtn').first().disabled = true;
+  try {
+    const gasPrice = await getGasPrice();
+    u('#currGasPrice').first().value = ethers.utils.formatUnits(gasPrice, 'gwei');
+  } catch (err) {
+    showErr(err);
+  }
+  u('#getGasPriceBtn').first().disabled = false;
 });
 u('#viewProposalBtn').handle('click', async (e) => {
-  console.log('viewProposalBtn');
-  const proposal = await getProposal();
-  console.log(proposal);
+  u('#viewProposalBtn').first().disabled = true;
+
+  let proposal, votes;
+  try {  
+    proposal = await getCurrProposal();
+    votes = await getVotes();
+    console.log(proposal, votes);
+  } catch (err) {
+    showErr(err);
+    return;
+  } finally {
+    u('#viewProposalBtn').first().disabled = false;
+  }
+
   u('#proposalTarget').first().value = proposal.target;
   u('#proposalDeadline').first().value = proposal.deadline;
-  const votes = await getVotes();
-  console.log(votes);
   u('#voteRows').empty();
   for (let vote of votes) {
     u('#voteRows').append(`<tr>
@@ -273,21 +314,58 @@ u('#viewProposalBtn').handle('click', async (e) => {
   }
 });
 u('#createProposalBtn').handle('click', async (e) => {
-  const gasPriceGwei = u('#votedGasPrice').first().value;
-  const gasPrice = ethers.utils.parseUnits(gasPriceGwei, 'gwei');
-  console.log('createProposalBtn', gasPriceGwei, gasPrice);
-  await createProposal(gasPrice);
+  u('#createProposalBtn').first().disabled = true;
+  try {
+    const gasPriceGwei = u('#votedGasPrice').first().value;
+    const gasPrice = ethers.utils.parseUnits(gasPriceGwei, 'gwei');
+    await createProposal(gasPrice);
+    showMsg('ok');
+  } catch (err) {
+    showErr(err);
+  }
+  u('#createProposalBtn').first().disabled = false;
 });
 u('#voteProposalBtn').handle('click', async (e) => {
-  const gasPriceGwei = u('#votedGasPrice').first().value;
-  const gasPrice = ethers.utils.parseUnits(gasPriceGwei, 'gwei');
-  console.log('voteProposalBtn', gasPriceGwei, gasPrice);
-  // TODO
+  u('#voteProposalBtn').first().disabled = true;
+  try {
+    const gasPriceGwei = u('#votedGasPrice').first().value;
+    const gasPrice = ethers.utils.parseUnits(gasPriceGwei, 'gwei');
+    await voteProposal(gasPrice);
+    showMsg('ok');
+  } catch (err) {
+    showErr(err);
+  }
+  u('#voteProposalBtn').first().disabled = false;
 });
 u('#execProposalBtn').handle('click', async (e) => {
-  console.log('execProposalBtn');
-  await execProposal();
+  u('#execProposalBtn').first().disabled = true;
+  try {
+    await execProposal();
+    showMsg('ok');
+  } catch (err) {
+    showErr(err);
+  }
+  u('#execProposalBtn').first().disabled = false;
 });
+
+function showMsg(msg) {
+  toast({
+    message: msg.toString(),
+    type: 'is-info',
+    dismissible: true,
+    duration: 2000,
+    // animate: { in: 'fadeIn', out: 'fadeOut' },
+  });
+}
+function showErr(err) {
+  toast({
+    message: '<code>' + JSON.stringify(err).replaceAll('\n', '<br/>') + '</code>',
+    type: 'is-warning',
+    dismissible: true,
+    duration: 10000,
+    // animate: { in: 'fadeIn', out: 'fadeOut' },
+  });
+}
 
 async function getAllValidators() {
   // const provider = new ethers.providers.Web3Provider(window.ethereum);
@@ -320,9 +398,11 @@ async function retireVal() {
 async function getGasPrice() {
   return await provider.getStorageAt(stakingAddr, 2);
 }
-async function getProposal() {
+async function getCurrProposal() {
   const result = await provider.getStorageAt(stakingAddr, 4);
-  if (result == '0x00000000000000000000000000000000') {
+  console.log('getCurrProposal:', result)
+  if (result == '0x00000000000000000000000000000000'
+    || result == '0x0000000000000000000000000000000000000000000000000000000000000000') {
     return {
       target: 'No Proposal',
       deadline: '',
@@ -356,6 +436,10 @@ async function getVotes() {
 }
 async function createProposal(gasPrice) {
   const tx = await staking.proposal(gasPrice);
+  console.log(tx);
+}
+async function voteProposal(gasPrice) {
+  const tx = await staking.vote(gasPrice);
   console.log(tx);
 }
 async function execProposal() {
