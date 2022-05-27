@@ -21,36 +21,26 @@
     <div class="panel is-link">
       <p class="panel-heading">All Validators</p>
       <div class="box">
-        <table class="table">
-          <thead>
-            <tr>
-              <th>CreatedBy</th>
-              <th>RewardTo</th>
-              <th>Minner</th>
-              <th>PubKey</th>
-              <th>Introduction</th>
-              <th>StakedCoins</th>
-              <th>IsRetiring</th>
-              <th>VotingPower</th>
-              <th>PendingRewards</th>
-            </tr>
-          </thead>
-          <tbody id="valRows">
-            <!--
-            <tr>
-              <td>0x</td>
-              <td>0x</td>
-              <td>0x</td>
-              <td>0x</td>
-              <td>?</td>
-              <td>?</td>
-              <td>?</td>
-              <td>?</td>
-              <td>?</td>
-            </tr>
-            -->
-          </tbody>
-        </table>
+        <div class="table-container">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>CreatedBy</th>
+                <th>RewardTo</th>
+                <th>Minner</th>
+                <th>PubKey</th>
+                <th>Introduction</th>
+                <th>StakedCoins</th>
+                <th>IsRetiring</th>
+                <th>VotingPower</th>
+                <th>PendingRewards</th>
+                <th>XHedgeVotes</th>
+              </tr>
+            </thead>
+            <tbody id="valRows">
+            </tbody>
+          </table>
+        </div>
         <div class="control">
           <button class="button is-link" id="viewValsBtn">Refresh</button>
         </div>
@@ -219,23 +209,41 @@ u('#tabGasOps').handle('click', async (e) => {
 u('#viewValsBtn').handle('click', async (e) => {
   u('#viewValsBtn').first().disabled = true;
 
-  console.log('getAllValidators...');
+  console.log('getAllValidators & posVotes ...');
+  const posVotesFuture = getPosVotes()
+    .then(result => result.posVotes)
+    .catch(err => {
+      console.log(err);
+      return [];
+    });
+
   const { validators, pendingRewards } = await getAllValidators()
     .catch(err => {
       console.log(err);
       return { validators:[], pendingRewards:[] };
     });
-  // console.log('validators:', validators);
-  // console.log('pendingRewards:', pendingRewards);
+  const posVotes = await posVotesFuture;
+  console.log('validators:', validators);
+  console.log('pendingRewards:', pendingRewards);
+  console.log('posVotes:', posVotes);
 
   // calc pending rewards
-  validators.forEach(val => val.pendingRewards = 0);
+  validators.forEach(val => {
+    val.pendingRewards = 0;
+    val.posVotes = 0;
+  });
   try {
     for (const reward of pendingRewards) {
       const amt = Number(ethers.utils.formatUnits(reward.amount));
-      const to = validators.find(val => val.address == reward.address);
-      if (to) {
-        to.pendingRewards += amt;
+      const val = validators.find(val => val.address == reward.address);
+      if (val) {
+        val.pendingRewards += amt;
+      }
+    }
+    for (const vote of posVotes) {
+      const val = validators.find(val => val.pubkey == vote.pubkey);
+      if (val) {
+        val.posVotes = vote.coinDays;
       }
     }
   } catch (err) {
@@ -256,6 +264,7 @@ u('#viewValsBtn').handle('click', async (e) => {
   <td>${val.is_retiring}</td>
   <td>${val.voting_power}</td>
   <td>${val.pendingRewards.toFixed(2)}</td>
+  <td>${val.posVotes.toFixed(2)}</td>
 </tr>`);
   }
 });
@@ -388,15 +397,22 @@ function showErr(err) {
   });
 }
 
-async function getAllValidators() {
+function getAllValidators() {
+  const provider = createJsonRpcProvider();
+  return provider.send('sbch_validatorsInfo', []);
+}
+function getPosVotes() {
+  const provider = createJsonRpcProvider();
+  return provider.send('sbch_getCurrEpoch', [true]);
+}
+function createJsonRpcProvider() {
   // const provider = new ethers.providers.Web3Provider(window.ethereum);
   const provider = new ethers.providers.JsonRpcProvider({
     // url    : 'https://rpc.uatvo.com',
     url    : 'https://smartbch.fountainhead.cash/mainnet',
     timeout: 10000,
   });
-
-  return await provider.send('sbch_validatorsInfo', []);
+  return provider;
 }
 
 async function createVal(rewardTo, intro, pubKey) {
