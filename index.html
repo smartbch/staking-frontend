@@ -390,6 +390,19 @@ function showErr(err) {
   });
 }
 
+class JsonRpcProviders {
+
+  constructor(urls, timeout) {
+    this.providers = urls.map(url => new ethers.providers.JsonRpcProvider({url: url, timeout: timeout}));
+  }
+
+  send(method, params) {
+    return Promise.any(this.providers.map(p => p.send(method, params)));
+  }
+
+}
+
+
 function getAllValidators() {
   const provider = createJsonRpcProvider();
   return provider.send('sbch_validatorsInfo', []);
@@ -400,11 +413,11 @@ function getPosVotes() {
 }
 function createJsonRpcProvider() {
   // const provider = new ethers.providers.Web3Provider(window.ethereum);
-  const provider = new ethers.providers.JsonRpcProvider({
-    // url    : 'https://rpc.uatvo.com',
-    url    : 'https://smartbch.fountainhead.cash/mainnet',
-    timeout: 10000,
-  });
+  const provider = new JsonRpcProviders([
+    'https://global.uat.cash',
+    'https://smartbch.greyh.at',
+    'https://smartbch.fountainhead.cash/mainnet',
+  ], 10000);
   return provider;
 }
 
