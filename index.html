@@ -25,6 +25,7 @@
           <table class="table">
             <thead>
               <tr>
+                <th>Index</th>
                 <th>CreatedBy</th>
                 <th>RewardTo</th>
                 <th>Minner</th>
@@ -246,8 +247,10 @@ u('#viewValsBtn').handle('click', async (e) => {
 
   u('#viewValsBtn').first().disabled = false;
   u('#valRows').empty();
+  let idx = 0;
   for (let val of validators) {
     u('#valRows').append(`<tr>
+  <td>${idx++}</td>
   <td><abbr title="${val.address}">${val.address.substring(0, 10)}</abbr></td>
   <td><abbr title="${val.reward_to}">${val.reward_to.substring(0, 10)}</abbr></td>
   <td><abbr title="${'0x'+val.miner_address}">${'0x'+val.miner_address.substring(0, 8)}</abbr></td>
