@@ -36,6 +36,7 @@
                 <th>VotingPower</th>
                 <th>PendingRewards</th>
                 <th><abbr title="CoinDays">XHedgeVotes</abbr></th>
+                <th>LastMinedBlock</th>
               </tr>
             </thead>
             <tbody id="valRows">
@@ -261,8 +262,21 @@ u('#viewValsBtn').handle('click', async (e) => {
   <td>${val.voting_power}</td>
   <td>${val.pendingRewards.toFixed(2)}</td>
   <td>${val.posVotes.toFixed(2)}</td>
+  <td id="miner_0X${val.miner_address}"></td>
 </tr>`);
   }
+
+  const provider = new ethers.providers.Web3Provider(window.ethereum);
+  await provider.getBlockNumber().then(n => {
+    for (let i = 0; i < 100; i++) {
+      const h = n - i;
+      provider.getBlock(h).then(b => {
+        console.log(b.miner, `#miner_${b.miner.toUpperCase()}`);
+        u(`#miner_${b.miner.toUpperCase()}`).text(`${h}`);
+      });
+    }
+  });
+
 });
   // <td><abbr title="${full}">${abbr}</abbr></td>
 u('#createValBtn').handle('click', async (e) => {
