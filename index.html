@@ -268,11 +268,16 @@ u('#viewValsBtn').handle('click', async (e) => {
 
   const provider = new ethers.providers.Web3Provider(window.ethereum);
   await provider.getBlockNumber().then(n => {
+    const miners = new Map(); // miner => h
+
     for (let i = 0; i < 100; i++) {
       const h = n - i;
       provider.getBlock(h).then(b => {
-        console.log(b.miner, `#miner_${b.miner.toUpperCase()}`);
-        u(`#miner_${b.miner.toUpperCase()}`).text(`${h}`);
+        console.log('block:', h, 'miner:', b.miner);
+        if (!(miners.get(b.miner) > h)) {
+          miners.set(b.miner, h);
+          u(`#miner_${b.miner.toUpperCase()}`).text(`${h}`);
+        }
       });
     }
   });
