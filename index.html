@@ -64,6 +64,10 @@
           <label class="label">PubKey (bytes32)</label>
           <input class="input" type="text" placeholder="0x0000000000000000000000000000000000000000000000000000000000000000" id="createValPubKey">
         </div>
+        <div class="field">
+          <label class="label">sBCH to Stake</label>
+          <input class="input" type="number" placeholder="32.0" id="createValStaked">
+        </div>
         <div class="control">
           <button class="button is-link" id="createValBtn">Submit</button>
         </div>
@@ -81,6 +85,10 @@
           <label class="label">Introduction (bytes32)</label>
           <input class="input" type="text" placeholder="at most 32 ASCI chars" id="editValIntro">
         </div> 
+        <div class="field">
+          <label class="label">More sBCH to Stake</label>
+          <input class="input" type="number" placeholder="1.0" id="editValStaked">
+        </div>
         <div class="control">
           <button class="button is-link" id="editValBtn">Submit</button>
         </div>
@@ -190,7 +198,7 @@ console.log('myAddr:', myAddr);
 const stakingAddr = '0x0000000000000000000000000000000000002710';
 const stakingABI = [
   `function createValidator(address rewardTo, bytes32 introduction, bytes32 pubkey) payable external`,
-  `function editValidator(address rewardTo, bytes32 introduction) external`,
+  `function editValidator(address rewardTo, bytes32 introduction) payable external`,
   `function retire() external`,
   `function proposal(uint target) external`,
   `function vote(uint target) external`,
@@ -300,10 +308,12 @@ u('#createValBtn').handle('click', async (e) => {
   const rewardTo = u('#createValRewardTo').first().value;
   const intro = u('#createValIntro').first().value;
   const pubKey = u('#createValPubKey').first().value;
+  const stakedBch = u('#createValStaked').first().value;
 
   u('#createValBtn').first().disabled = true;
   try {
-    await createVal(rewardTo, intro, pubKey);
+    await createVal(rewardTo, intro, pubKey,
+      ethers.utils.parseEther(stakedBch));
     showMsg('ok');
   } catch (err) {
     showErr(err);
@@ -313,10 +323,12 @@ u('#createValBtn').handle('click', async (e) => {
 u('#editValBtn').handle('click', async (e) => {
   const rewardTo = u('#editValRewardTo').first().value;
   const intro = u('#editValIntro').first().value;
+  const moreStakedBch = u('#editValStaked').first().value || '0';
 
   u('#editValBtn').first().disabled = true;
   try {
-    await editVal(rewardTo, intro);
+    await editVal(rewardTo, intro,
+      ethers.utils.parseEther(moreStakedBch));
     showMsg('ok');
   } catch (err) {
     showErr(err);
@@ -472,16 +484,16 @@ function createJsonRpcProvider() {
   return provider;
 }
 
-async function createVal(rewardTo, intro, pubKey) {
+async function createVal(rewardTo, intro, pubKey, stakedBch) {
   intro = ethers.utils.formatBytes32String( intro );
   console.log('intro:', intro);
-  const tx = await staking.createValidator(rewardTo, intro, pubKey, {value: 1});
+  const tx = await staking.createValidator(rewardTo, intro, pubKey, {value: stakedBch});
   console.log(tx);
 }
-async function editVal(rewardTo, intro) {
+async function editVal(rewardTo, intro, moreStakedBch) {
   intro = ethers.utils.formatBytes32String( intro );
   console.log('intro:', intro);
-  const tx = await staking.editValidator(rewardTo, intro);
+  const tx = await staking.editValidator(rewardTo, intro, {value: moreStakedBch});
   console.log(tx);
 }
 async function retireVal() {
