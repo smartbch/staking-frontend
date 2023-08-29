@@ -37,6 +37,8 @@
                 <th>PendingRewards</th>
                 <th><abbr title="CoinDays">XHedgeVotes</abbr></th>
                 <th>LastMinedBlock</th>
+                <th>LastSignedBlock</th>
+                <th>SigCountInWindow</th>
               </tr>
             </thead>
             <tbody id="valRows">
@@ -266,10 +268,31 @@ u('#viewValsBtn').handle('click', async (e) => {
   }
   console.log('validators:', validators);
 
+  const onlineInfoMap = new Map();
+  let windowInfo = '?';
+  try {
+    const onlineInfo = await getValsOnlineInfo();
+    console.log('onlineInfo:', onlineInfo);
+
+    windowInfo = `${onlineInfo.start_height} ~ ${onlineInfo.end_height}`;
+    for (const info of onlineInfo.online_infos) {
+      onlineInfoMap.set(info.validator_consensus_address, {
+        sigCount: info.signature_count,
+        lastSigH: info.height_of_last_signature,
+      });
+    }
+    console.log('online info map:', onlineInfoMap);
+  } catch (err) {
+    console.log('failed to get onlie info:', err);
+  }
+
   u('#viewValsBtn').first().disabled = false;
   u('#valRows').empty();
   let idx = 0;
   for (let val of validators) {
+    const minerKey = '0x'+val.miner_address.toLowerCase();
+    const onlineInfo = onlineInfoMap.get(minerKey);
+
     u('#valRows').append(`<tr>
   <td>${idx++}</td>
   <td><abbr title="${val.address}">${val.address.substring(0, 10)}</abbr></td>
@@ -283,6 +306,8 @@ u('#viewValsBtn').handle('click', async (e) => {
   <td><abbr title="${val.pendingRewards}">${val.pendingRewards.toFixed(2)}</abbr></td>
   <td bgcolor=${val.posVotes > 1 ? '"green"' : '"red"'}><abbr title="${val.posVotes}">${val.posVotes.toFixed(2)}</abbr></td>
   <td id="miner_0X${val.miner_address}"></td>
+  <td>${onlineInfo?.lastSigH || ''}</td>
+  <td><abbr title="${windowInfo}">${onlineInfo?.sigCount || ''}</abbr></td>
 </tr>`);
   }
 
@@ -465,7 +490,10 @@ class JsonRpcProviders {
 
 }
 
-
+function getValsOnlineInfo(argument) {
+  const provider = createJsonRpcProvider();
+  return provider.send('debug_validatorOnlineInfos', []);
+}
 function getAllValidators() {
   const provider = createJsonRpcProvider();
   return provider.send('sbch_validatorsInfo', []);
