@@ -269,6 +269,7 @@ u('#viewValsBtn').handle('click', async (e) => {
   console.log('validators:', validators);
 
   const onlineInfoMap = new Map();
+  const maybeSlashedSet = new Set();
   let windowInfo = '?';
   try {
     const onlineInfo = await getValsOnlineInfo();
@@ -281,7 +282,13 @@ u('#viewValsBtn').handle('click', async (e) => {
         lastSigH: info.height_of_last_signature,
       });
     }
-    console.log('online info map:', onlineInfoMap);
+    if (onlineInfo.validators_maybe_slashed?.length > 0) {
+      for (const addr of onlineInfo.validators_maybe_slashed) {
+        maybeSlashedSet.add(addr);
+      }
+    }
+    console.log('onlineInfoMap:', onlineInfoMap);
+    console.log('maybeSlashedSet:', maybeSlashedSet);
   } catch (err) {
     console.log('failed to get onlie info:', err);
   }
@@ -292,6 +299,7 @@ u('#viewValsBtn').handle('click', async (e) => {
   for (let val of validators) {
     const minerKey = '0x'+val.miner_address.toLowerCase();
     const onlineInfo = onlineInfoMap.get(minerKey);
+    const maybeSlashed = maybeSlashedSet.has(minerKey);
 
     u('#valRows').append(`<tr>
   <td>${idx++}</td>
@@ -307,7 +315,7 @@ u('#viewValsBtn').handle('click', async (e) => {
   <td bgcolor=${val.posVotes > 1 ? '"green"' : '"red"'}><abbr title="${val.posVotes}">${val.posVotes.toFixed(2)}</abbr></td>
   <td id="miner_0X${val.miner_address}"></td>
   <td>${onlineInfo?.lastSigH || ''}</td>
-  <td><abbr title="${windowInfo}">${onlineInfo?.sigCount || ''}</abbr></td>
+  <td ${maybeSlashed ? 'bgcolor="red"': ""}><abbr title="${windowInfo}">${onlineInfo?.sigCount || ''}</abbr></td>
 </tr>`);
   }
 
