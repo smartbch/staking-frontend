@@ -37,6 +37,8 @@
                 <th>PendingRewards</th>
                 <th><abbr title="CoinDays">XHedgeVotes</abbr></th>
                 <th>LastMinedBlock</th>
+                <th>LastSignedBlock</th>
+                <th>HealthRate</th>
               </tr>
             </thead>
             <tbody id="valRows">
@@ -64,6 +66,10 @@
           <label class="label">PubKey (bytes32)</label>
           <input class="input" type="text" placeholder="0x0000000000000000000000000000000000000000000000000000000000000000" id="createValPubKey">
         </div>
+        <div class="field">
+          <label class="label">sBCH to Stake</label>
+          <input class="input" type="number" placeholder="32.0" id="createValStaked">
+        </div>
         <div class="control">
           <button class="button is-link" id="createValBtn">Submit</button>
         </div>
@@ -81,6 +87,10 @@
           <label class="label">Introduction (bytes32)</label>
           <input class="input" type="text" placeholder="at most 32 ASCI chars" id="editValIntro">
         </div> 
+        <div class="field">
+          <label class="label">More sBCH to Stake</label>
+          <input class="input" type="number" placeholder="1.0" id="editValStaked">
+        </div>
         <div class="control">
           <button class="button is-link" id="editValBtn">Submit</button>
         </div>
@@ -190,7 +200,7 @@ console.log('myAddr:', myAddr);
 const stakingAddr = '0x0000000000000000000000000000000000002710';
 const stakingABI = [
   `function createValidator(address rewardTo, bytes32 introduction, bytes32 pubkey) payable external`,
-  `function editValidator(address rewardTo, bytes32 introduction) external`,
+  `function editValidator(address rewardTo, bytes32 introduction) payable external`,
   `function retire() external`,
   `function proposal(uint target) external`,
   `function vote(uint target) external`,
@@ -258,10 +268,76 @@ u('#viewValsBtn').handle('click', async (e) => {
   }
   console.log('validators:', validators);
 
+  const provider = new ethers.providers.Web3Provider(window.ethereum);
+  const currH = await provider.getBlockNumber();
+  console.log('currH:', currH);
+
+  const onlineInfoMap = new Map();
+  const maybeSlashedSet = new Set();
+  let winInfo = {};
+  try {
+    const onlineInfo = await getValsOnlineInfo();
+    console.log('onlineInfo:', onlineInfo);
+
+    winInfo = {
+      startH: onlineInfo.start_height,
+      endH: onlineInfo.end_height,
+    }
+
+    for (const info of onlineInfo.online_infos) {
+      onlineInfoMap.set(info.validator_consensus_address, {
+        sigCount: info.signature_count,
+        lastSigH: info.height_of_last_signature,
+      });
+    }
+    if (onlineInfo.validators_maybe_slashed?.length > 0) {
+      for (const addr of onlineInfo.validators_maybe_slashed) {
+        maybeSlashedSet.add(addr);
+      }
+    }
+    console.log('onlineInfoMap:', onlineInfoMap);
+    console.log('maybeSlashedSet:', maybeSlashedSet);
+  } catch (err) {
+    console.log('failed to get onlie info:', err);
+  }
+
   u('#viewValsBtn').first().disabled = false;
   u('#valRows').empty();
   let idx = 0;
   for (let val of validators) {
+    const minerKey = '0x'+val.miner_address.toLowerCase();
+    const onlineInfo = onlineInfoMap.get(minerKey);
+    const maybeSlashed = maybeSlashedSet.has(minerKey);
+
+
+    let sigRowInfo = '';
+    let sigRowExtroInfo = '';
+    let sigRowBgColor = '';
+    if (onlineInfo) {
+      const winSize = 14400;
+      const elapsedBlocks = Math.max(currH - winInfo.startH + 1, onlineInfo.sigCount);
+      const unsignedBlocks = elapsedBlocks - onlineInfo.sigCount;
+      const healthRate = 1 - unsignedBlocks / (winSize * 0.4);
+      console.log('miner:', minerKey, 
+        'elapsedBlocks:', elapsedBlocks,
+        'signedBlock:', onlineInfo.sigCount,
+        'unsignedBlocks:', unsignedBlocks, 
+        'healthRate:', healthRate);
+
+      sigRowInfo = healthRate.toFixed(2);
+      sigRowExtroInfo = `window: ${winInfo.startH} ~ ${winInfo.endH}` 
+        + `, signed blocks: ${onlineInfo.sigCount}, unsigned blocks: ${unsignedBlocks}`
+        + `, health rate: ${healthRate}`;
+
+      sigRowBgColor = `bgcolor="green"`;
+      if (healthRate < 0.8) {
+        sigRowBgColor = `bgcolor="yellow"`;
+      }
+      if (healthRate < 0.2) {
+        sigRowBgColor = `bgcolor="red"`;
+      }
+    }
+
     u('#valRows').append(`<tr>
   <td>${idx++}</td>
   <td><abbr title="${val.address}">${val.address.substring(0, 10)}</abbr></td>
@@ -275,24 +351,22 @@ u('#viewValsBtn').handle('click', async (e) => {
   <td><abbr title="${val.pendingRewards}">${val.pendingRewards.toFixed(2)}</abbr></td>
   <td bgcolor=${val.posVotes > 1 ? '"green"' : '"red"'}><abbr title="${val.posVotes}">${val.posVotes.toFixed(2)}</abbr></td>
   <td id="miner_0X${val.miner_address}"></td>
+  <td>${onlineInfo?.lastSigH || ''}</td>
+  <td ${sigRowBgColor}><abbr title="${sigRowExtroInfo}">${sigRowInfo}</abbr></td>
 </tr>`);
   }
 
-  const provider = new ethers.providers.Web3Provider(window.ethereum);
-  await provider.getBlockNumber().then(n => {
-    const miners = new Map(); // miner => h
-
-    for (let i = 0; i < 100; i++) {
-      const h = n - i;
-      provider.getBlock(h).then(b => {
-        console.log('block:', h, 'miner:', b.miner);
-        if (!(miners.get(b.miner) > h)) {
-          miners.set(b.miner, h);
-          u(`#miner_${b.miner.toUpperCase()}`).text(`${h}`);
-        }
-      });
-    }
-  });
+  const miners = new Map(); // miner => h
+  for (let i = 0; i < 100; i++) {
+    const h = currH - i;
+    provider.getBlock(h).then(b => {
+      console.log('block:', h, 'miner:', b.miner);
+      if (!(miners.get(b.miner) > h)) {
+        miners.set(b.miner, h);
+        u(`#miner_${b.miner.toUpperCase()}`).text(`${h}`);
+      }
+    });
+  }
 
 });
   // <td><abbr title="${full}">${abbr}</abbr></td>
@@ -300,10 +374,12 @@ u('#createValBtn').handle('click', async (e) => {
   const rewardTo = u('#createValRewardTo').first().value;
   const intro = u('#createValIntro').first().value;
   const pubKey = u('#createValPubKey').first().value;
+  const stakedBch = u('#createValStaked').first().value;
 
   u('#createValBtn').first().disabled = true;
   try {
-    await createVal(rewardTo, intro, pubKey);
+    await createVal(rewardTo, intro, pubKey,
+      ethers.utils.parseEther(stakedBch));
     showMsg('ok');
   } catch (err) {
     showErr(err);
@@ -313,10 +389,12 @@ u('#createValBtn').handle('click', async (e) => {
 u('#editValBtn').handle('click', async (e) => {
   const rewardTo = u('#editValRewardTo').first().value;
   const intro = u('#editValIntro').first().value;
+  const moreStakedBch = u('#editValStaked').first().value || '0';
 
   u('#editValBtn').first().disabled = true;
   try {
-    await editVal(rewardTo, intro);
+    await editVal(rewardTo, intro,
+      ethers.utils.parseEther(moreStakedBch));
     showMsg('ok');
   } catch (err) {
     showErr(err);
@@ -453,7 +531,10 @@ class JsonRpcProviders {
 
 }
 
-
+function getValsOnlineInfo(argument) {
+  const provider = createJsonRpcProvider();
+  return provider.send('debug_validatorOnlineInfos', []);
+}
 function getAllValidators() {
   const provider = createJsonRpcProvider();
   return provider.send('sbch_validatorsInfo', []);
@@ -472,16 +553,16 @@ function createJsonRpcProvider() {
   return provider;
 }
 
-async function createVal(rewardTo, intro, pubKey) {
+async function createVal(rewardTo, intro, pubKey, stakedBch) {
   intro = ethers.utils.formatBytes32String( intro );
   console.log('intro:', intro);
-  const tx = await staking.createValidator(rewardTo, intro, pubKey, {value: 1});
+  const tx = await staking.createValidator(rewardTo, intro, pubKey, {value: stakedBch});
   console.log(tx);
 }
-async function editVal(rewardTo, intro) {
+async function editVal(rewardTo, intro, moreStakedBch) {
   intro = ethers.utils.formatBytes32String( intro );
   console.log('intro:', intro);
-  const tx = await staking.editValidator(rewardTo, intro);
+  const tx = await staking.editValidator(rewardTo, intro, {value: moreStakedBch});
   console.log(tx);
 }
 async function retireVal() {
