@@ -109,11 +109,8 @@
     <div class="panel is-link">
       <p class="panel-heading">Epoch Progress</p>
       <div class="box">
-        <div id="epochProgressBchBlocksTxt">BCH mainnet blocks: ?/2016</div>
-        <progress class="progress is-link" value="0" max="2016" id="epochProgressBar">0%</progress>
-        <div class="control">
-          <button class="button is-link" id="epochProgressRefreshBtn">Refresh</button>
-        </div>
+        <div id="epochProgressBchBlocksTxt">BCH mainnet blocks: ?/201600</div>
+        <progress class="progress is-link" value="0" max="201600" id="epochProgressBar">0%</progress>
       </div>
     </div>
 
@@ -356,6 +353,14 @@ u('#viewValsBtn').handle('click', async (e) => {
 </tr>`);
   }
 
+  // epoch progress
+  const purePosGenesisHeight = 11006000
+  const purePosEpochBlocks   = 201600
+  const epochProgress = (currH - 11006000) % purePosEpochBlocks;
+  console.log('epochProgress:', epochProgress);
+  u('#epochProgressBchBlocksTxt').text(`BCH mainnet blocks: ${epochProgress}/201600`);
+  u('#epochProgressBar').first().value = epochProgress; 
+
   const miners = new Map(); // miner => h
   for (let i = 0; i < 100; i++) {
     const h = currH - i;
@@ -482,23 +487,6 @@ u('#execProposalBtn').handle('click', async (e) => {
   }
   u('#execProposalBtn').first().disabled = false;
 });
-u('#epochProgressRefreshBtn').handle('click', async (e) => {
-  u('#epochProgressRefreshBtn').first().disabled = true;
-
-  try {
-    const bchHeight = await getHeightOfBCH();
-    console.log('bchHeight:', bchHeight);
-    const minedBlocks = bchHeight - 698502;
-    const currEpochEndBlock = 698502 + (minedBlocks/2016+1)*2016;
-    const currEpochProgress = minedBlocks % 2016;
-    // console.log(currEpochEndBlock, currEpochProgress);
-
-    u('#epochProgressBchBlocksTxt').text(`BCH mainnet blocks: ${currEpochProgress}/2016`);
-    u('#epochProgressBar').first().value = currEpochProgress; 
-  } finally {
-    u('#epochProgressRefreshBtn').first().disabled = false;
-  }
-});
 
 function showMsg(msg) {
   toast({
@@ -621,15 +609,6 @@ async function execProposal() {
   const tx = await staking.executeProposal();
   console.log(tx);
 }
-
-
-// https://blockchair.com/api/docs#link_100
-function getHeightOfBCH() {
-  return fetch('https://api.blockchair.com/bitcoin-cash/dashboards/block/760926?limit=0')
-    .then(result => result.json())
-    .then(result => result.context.state);
-}
-
 
   </script>
   </body>
