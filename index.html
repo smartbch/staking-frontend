@@ -227,13 +227,13 @@ u('#viewValsBtn').handle('click', async (e) => {
   const posVotesFuture = getPosVotes()
     .then(result => result.posVotes)
     .catch(err => {
-      console.log(err);
+      console.log('failed to get pos votes', err);
       return [];
     });
 
   const { validators, pendingRewards } = await getAllValidators()
     .catch(err => {
-      console.log(err);
+      console.log('failed to get all validators', err);
       return { validators:[], pendingRewards:[] };
     });
   const posVotes = await posVotesFuture;
@@ -265,8 +265,10 @@ u('#viewValsBtn').handle('click', async (e) => {
   }
   console.log('validators:', validators);
 
-  const provider = new ethers.providers.Web3Provider(window.ethereum);
-  const currH = await provider.getBlockNumber();
+  // const provider = new ethers.providers.Web3Provider(window.ethereum);
+  // const currH = await provider.getBlockNumber();
+  const provider = createJsonRpcProvider();
+  const currH = await provider.send('eth_blockNumber', []);
   console.log('currH:', currH);
 
   const onlineInfoMap = new Map();
@@ -362,9 +364,11 @@ u('#viewValsBtn').handle('click', async (e) => {
   u('#epochProgressBar').first().value = epochProgress; 
 
   const miners = new Map(); // miner => h
-  for (let i = 0; i < 100; i++) {
+  for (let i = 0; i < 20; i++) {
     const h = currH - i;
-    provider.getBlock(h).then(b => {
+    // provider.getBlock(h)
+    provider.send('eth_getBlockByNumber', ['0x'+h.toString(16), false])
+      .then(b => {
       console.log('block:', h, 'miner:', b.miner);
       if (!(miners.get(b.miner) > h)) {
         miners.set(b.miner, h);
@@ -523,9 +527,10 @@ function getValsOnlineInfo(argument) {
   const provider = createJsonRpcProvider();
   return provider.send('debug_validatorOnlineInfos', []);
 }
-function getAllValidators() {
+async function getAllValidators() {
   const provider = createJsonRpcProvider();
-  return provider.send('sbch_validatorsInfo', []);
+  const currH = await provider.send('eth_blockNumber', []);
+  return provider.send('sbch_validatorsInfo', [currH]);
 }
 function getPosVotes() {
   const provider = createJsonRpcProvider();
@@ -534,9 +539,11 @@ function getPosVotes() {
 function createJsonRpcProvider() {
   // const provider = new ethers.providers.Web3Provider(window.ethereum);
   const provider = new JsonRpcProviders([
-    'https://global.uat.cash',
-    'https://smartbch.greyh.at',
-    'https://smartbch.fountainhead.cash/mainnet',
+    // 'https://global.uat.cash',
+    // 'https://smartbch.greyh.at',
+    // 'https://smartbch.fountainhead.cash/mainnet',
+    'https://rpc.smartbch.org',
+    'http://13.212.74.236:8545',
   ], 10000);
   return provider;
 }
